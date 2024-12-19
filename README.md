@@ -1,2 +1,2 @@
-# shqa
-Scholarly hybrid question answering using parsing
+# Bridge-Generate: Scholarly Hybrid QA
+Scholarly hybrid question answering using bridge-generate approach.
