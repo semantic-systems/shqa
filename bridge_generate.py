@@ -67,7 +67,7 @@ def answer_generation(question, assertion, context):
 
                  ANSWER: 
                 """
-    answer = llms.chatgpt(prompt, 4)  # test_chatAI.test_chat_ai(prompt) # llms.chatgpt(prompt, 4)  #   #
+    answer = llms.chatgpt(prompt, 4)
     return answer
 
 
