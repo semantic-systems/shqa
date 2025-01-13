@@ -2,11 +2,11 @@ import llms
 import utils
 from urllib.parse import urlparse
 
-def generate_assertion_statement(sub_question_phrase, entity, flag=False):
+def generate_assertion_statement(entity_encapsulating_phrase, entity, flag=False):
     prompt = f"""[INST]Task: Form a sentence by joining the given PHRASE and ANSWER. Be sure the sentence is grammatically and semantically correct.
             Only return the sentence.
             [/INST]
-            PHRASE: {sub_question_phrase}
+            PHRASE: {entity_encapsulating_phrase}
             ANSWER:{entity}
 
             sentence:
@@ -21,7 +21,7 @@ def generate_assertion_statement(sub_question_phrase, entity, flag=False):
             ANSWER: Notre Dame University
             sentence: The academic institution of Fang Liu is Notre Dame University.
             [/INST]
-            QUESTION: {sub_question_phrase}
+            QUESTION: {entity_encapsulating_phrase}
             ANSWER:{entity}
 
             sentence:
@@ -73,12 +73,12 @@ def answer_generation(question, assertion, context):
 
 def identify_entity_encapsulating_phrase(question, q_type =''):
     example = ''
-    prompt = f"""[INST]Task: Your task is extracting the sub-question phrases and publication titles in a given QUESTION.
+    prompt = f"""[INST]Task: Your task is extracting the entity encapsulating phrases and publication titles in a given QUESTION.
                 Example:
                  {example}                    
                 Do not add anything else.
                 [/INST]          
-                [{{sub_question_phrase: sub question phrase}},
+                [{{entity_encapsulating_phrase: entity encapsulating phrase}},
                 {{title: title}}
                 ]
                 [INST]
@@ -88,8 +88,8 @@ def identify_entity_encapsulating_phrase(question, q_type =''):
                 question: {question}
 
             """
-    sub_questions = llms.chatgpt(prompt, 5)
-    utils.write_to_json(sub_questions, "./entity_encapsulating_phrase.json")
+    entity_encapsulating_phrase = llms.chatgpt(prompt, 5)
+    utils.write_to_json(entity_encapsulating_phrase, "./entity_encapsulating_phrase.json")
     formatted_entity_encapsulating_phrase = utils.load_json_data("./entity_encapsulating_phrase.json")
     return formatted_entity_encapsulating_phrase
 
@@ -135,12 +135,12 @@ def entity_semoa_facts(semoa_record):
 
 def identify_next_hop(updated_question):
     example = ""
-    prompt = f"""[INST]Task: Your task is extracting the sub-question phrase in the QUESTION. 
+    prompt = f"""[INST]Task: Your task is extracting the entity encapsulating phrase in the QUESTION. 
                     Example:
                     {example}                    
                     Do not add anything else.
                     [/INST]          
-                    [{{sub_question_phrase: sub question phrase}}]
+                    [{{entity_encapsulating_phrase: entity encapsulating phrase}}]
                     [INST]
                     Please provide your result in JSON format only. Please do not include the Example in your response.
                     [/INST] 
@@ -198,8 +198,102 @@ def answer_kg_text_questions(question, q_type, author_dblp_uri, flag=False):
         return None, deduplicated_assertions, question_update_history, context, entity_phrase
 
 
+def answer_extractor(question, context):
+    prompt = f"""Task: Your task is answering the question based on the given context.
+                     Do not add anything else.
+                     Please provide your result in JSON format only. Please do not include the Example in your response.
+
+                     context: {context}
+                     question:{question}
+                     answer: 
+                """
+    answer = llms.chatgpt(prompt, 4)
+    return answer
+
+
 def answer_kg_kg_questions(question, q_type, author_dblp_uri):
-    pass
+    entity_encapsulating_phrase = (identify_entity_encapsulating_phrase(question, q_type))
+    context = []
+    question_updating_process = [question]
+    updated_question = question
+    entity_phrase = ''
+    assertions = []
+    if 'entity_encapsulating_phrase' in entity_encapsulating_phrase:
+        visited_nodes = []
+        if q_type == 'bridge':
+            entity_phrase = entity_encapsulating_phrase['entity_encapsulating_phrase'][0]
+            title = get_title(entity_phrase)
+            entity = utils.entity_linking(title)
+            author_uri = author_dblp_uri.strip('<>')
+            if entity:
+                for entity_item in entity:
+                    if 'orcid' in entity_item:
+                        if urlparse(entity_item['author']) == urlparse(author_uri):
+                            updated_question = question.replace(entity_phrase, entity_item['primarycreatorname'])
+                            assertions.append(
+                                generate_assertion_statement(entity_phrase, entity_item['primarycreatorname']))
+                            question_updating_process.append(updated_question)
+                        semoa_record = utils.search_semoa(entity_item['orcid'])
+                        # print(semoa_record)
+                        if entity_item['author'] not in visited_nodes:
+                            visited_nodes.append(entity_item['author'])
+                            context.append(semoa_record)
+                if question_updating_process[-1] != question:
+                    if context:
+                        next_hop = identify_next_hop(question_updating_process[-1])
+                        # next_hop_phrases = next_hop.split(';')
+                        assertions.append(generate_assertion_statement(next_hop, answer_extractor(next_hop + '?', context)))
+        if q_type == 'comparison':
+            author_uris = [author_dblp_uri[0]['author1_dblp_uri'].strip('<>'),
+                           author_dblp_uri[0]['author2_dblp_uri'].strip('<>')]
+            if len(entity_encapsulating_phrase['entity_encapsulating_phrase']) > 1:
+                title_1 = identify_title(entity_encapsulating_phrase['entity_encapsulating_phrase'][0])
+                title_2 = identify_title(entity_encapsulating_phrase['entity_encapsulating_phrase'][1])
+                entity_1 = utils.entity_linking(title_1['title'][0])
+                entity_2 = utils.entity_linking(title_2['title'][0])
+                if entity_1 and entity_2:
+                    for entity_1_item in entity_1:
+                        if 'orcid' in entity_1_item:
+                            if entity_1_item['author'] in author_uris:
+                                updated_question = question.replace(entity_encapsulating_phrase['entity_encapsulating_phrase'][0], entity_1_item['primarycreatorname'])
+                                assertions.append(generate_assertion_statement(entity_encapsulating_phrase['entity_encapsulating_phrase'][0], entity_1_item['primarycreatorname']))
+                            semoa_record_1 = utils.search_semoa(entity_1_item['orcid'])
+
+                            if entity_1_item['author'] not in visited_nodes:
+                                visited_nodes.append(entity_1_item['author'])
+                                context.append(semoa_record_1)
+
+                    for entity_2_item in entity_2:
+                        if 'orcid' in entity_2_item:
+                            if entity_2_item['author'] in author_uris:
+                                updated_question = updated_question.replace(entity_encapsulating_phrase['entity_encapsulating_phrase'][1], entity_2_item['primarycreatorname'])
+                                assertions.append(generate_assertion_statement(entity_encapsulating_phrase['entity_encapsulating_phrase'][1], entity_2_item['primarycreatorname']))
+                                question_updating_process.append(updated_question)
+                            semoa_record_2 = utils.search_semoa(entity_2_item['orcid'])
+                            if entity_2_item['author'] not in visited_nodes:
+                                visited_nodes.append(entity_2_item['author'])
+                                context.append(semoa_record_2)
+                    if question_updating_process[-1] != question:
+                        if context:
+                            prev_entity_encapsulating_phrase = question_updating_process[-1]
+                            next_hop = identify_next_hop(prev_entity_encapsulating_phrase)
+                            next_hop_phrases = next_hop.split(';')
+                            print(next_hop_phrases)
+                            if len(next_hop_phrases) > 1:
+                                ans_1 = answer_extractor(next_hop_phrases[0] + '?', context)
+                                assertions.append(generate_assertion_statement(next_hop_phrases[0], ans_1))
+                                ans_2 = answer_extractor(next_hop_phrases[1] + '?', context)
+                                assertions.append(generate_assertion_statement(next_hop_phrases[1], ans_2))
+                                next_entity_encapsulating_phrase = prev_entity_encapsulating_phrase.replace(next_hop_phrases[0], ans_1)
+                                next_entity_encapsulating_phrase = next_entity_encapsulating_phrase.replace(next_hop_phrases[1], ans_2)
+                                question_updating_process.append(next_entity_encapsulating_phrase)
+    question_update_history = utils.deduplicate_list(question_updating_process)
+    deduplicated_assertions = utils.deduplicate_list(assertions)
+    if context:
+        answer = answer_generation(question, deduplicated_assertions, context)
+        return answer, deduplicated_assertions, question_update_history, context, entity_phrase
+    else:
+        return None, deduplicated_assertions, question_update_history, context, entity_phrase
 
 
 def main(test_data_file):
