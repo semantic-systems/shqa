@@ -157,3 +157,59 @@ def deduplicate_list(input_list):
             seen.add(item)
             output_list.append(item)
     return output_list
+
+
+def run_sparql_query(sparql_endpoint, sparql_query, param='', flag=False):
+    if flag:
+        sparql_query = sparql_query % param
+    try:
+        sparql = SPARQLWrapper(sparql_endpoint)
+        sparql.setQuery(sparql_query)
+        sparql.setReturnFormat(JSON)
+        result = sparql.query().convert()
+        return result
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        return None
+    return
+
+
+def entity_linking(entity='', flag=True):
+    sparql_end_point = "https://dblp-april24.skynet.coypu.org/sparql"
+    if flag:
+        entity = entity.rstrip("'")
+        entity = entity.lstrip("'")
+        entity = entity.rstrip('"')
+        entity = entity.lstrip('"')
+        if not entity.endswith('.'):
+            entity += '.'
+        query = """PREFIX dblp: <https://dblp.org/rdf/schema#>
+                    SELECT *
+                      WHERE {
+                      ?paper dblp:title "%s" .
+                      ?author ^dblp:authoredBy ?paper ;
+                              dblp:primaryCreatorName ?primarycreatorname ;
+                              dblp:orcid ?orcid ;
+                              dblp:wikipedia ?wikipedia .
+                      FILTER (CONTAINS(STR(?wikipedia), "en.wikipedia.org"))
+                    }"""
+    else:
+        query = """PREFIX dblp: <https://dblp.org/rdf/schema#>
+                    SELECT *
+                      WHERE {
+                      %s dblp:primaryCreatorName ?primarycreatorname ;
+                         dblp:orcid ?orcid ;
+                         dblp:wikipedia ?wikipedia .
+                      FILTER (CONTAINS(STR(?wikipedia), "en.wikipedia.org"))
+                    }"""
+
+    sparql_result = run_sparql_query(sparql_end_point, query, entity, True)
+    search_result = []
+    if sparql_result:
+        for result in sparql_result["results"]["bindings"]:
+            temp = {}
+            for key, value_info in result.items():
+                temp[key] = value_info.get('value')
+            search_result.append(temp)
+    # print(search_result)
+    return search_result
