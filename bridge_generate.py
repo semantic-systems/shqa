@@ -32,3 +32,25 @@ def generate_assertion_statement(sub_question_phrase, entity, flag=False):
         return assertion_sentence_formatted[0]['text']
     else:
         return ''
+
+
+def generate_context(question, assertions, entity):
+    prompt = f"""Task: Your task is generating a text about an entity. The text should include facts about the entity, that allow to answer questions like {question}'.
+
+                TEXT:
+        """
+    new_prompt = f"""Task: Your task is generating a text about an entity. The text should include facts about the entity, that allow to answer questions like {question}'.
+                      ASSERTIONS: {assertions}
+                      ENTITY: {entity}
+
+                      TEXT:
+                """
+    context = llms.chatgpt(new_prompt, 8)
+    utils.write_to_json([context], "temp.json")
+    context_formatted = utils.load_json_data("temp.json")
+    if 'text' in context_formatted[0]:
+        return context_formatted[0]['text']
+    else:
+        return ''
+
+
