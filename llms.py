@@ -21,55 +21,20 @@ def chatgpt(prompt, model="gpt-3.5-turbo", function_call_flag=1):
 
         }
     ]
-    sparql_generation_function = [
+
+    entity_encapsulating_phrase_identification_function = [
         {
-            "name": "sparql_generation_function",
-            "description": "Generate a SPARQL query for the given question.",
+            "name": "entity_encapsulating_phrase_identification_function",
+            "description": "Extract the entity encapsulating phrases and title from the given question.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "sparql": {
-                        "type": "string",
-                        "description": "SPARQL of a given question",
-                    }
-                }
-            }
-
-        }
-    ]
-
-    sub_question_generation_function = [
-        {
-            "name": "sub_question_generation_function",
-            "description": "Decompose the given question to its sub_questions.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "sub_questions": {
+                    "entity_encapsulating_phrase": {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
-                        "description": "Sub-questions of the given question. Be sure to follow the examples given in the prompt",
-                    }
-                }
-            }
-
-        }
-    ]
-    sub_question_phrase_identification_function = [
-        {
-            "name": "sub_question_phrase_identification_function",
-            "description": "Extract the sub-question phrases and title from the given question.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "sub_question_phrase": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "Sub-question phrase in a given question. Be sure to follow the examples given in the prompt",
+                        "description": "Entity encapsulating phrase in a given question. Be sure to follow the examples given in the prompt",
                     },
                     "title": {
                         "type": "array",
@@ -102,37 +67,50 @@ def chatgpt(prompt, model="gpt-3.5-turbo", function_call_flag=1):
 
         }
     ]
-
-    question_parser = [
+    next_hop_phrase_extraction = [
         {
-            "name": "question_parser",
-            "description": "Parse the given question.",
+            "name": "next_hop_phrase_extraction",
+            "description": "Extract the entity encapsulating phrase from the given question.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "hq_expression": {
+                    "entity_encapsulating_phrase": {
                         "type": "string",
-                        "description": "Parsed representation of the given question",
+                        "description": "Next hop phrase. Be sure to follow the examples given in the prompt",
                     }
                 }
             }
 
         }
     ]
-    if function_call_flag == 1:
-        function_call = question_parser
-    elif function_call_flag == 2:
-        function_call = sub_question_generation_function
-    elif function_call_flag == 3:
-        function_call = sparql_generation_function
-    elif function_call_flag == 4:
+    text_generation_function = [
+        {
+            "name": "text_generation_function",
+            "description": "Generate a text.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "Generated Text.",
+                    }
+                }
+            }
+
+        }
+    ]
+
+    if function_call_flag == 4:
         function_call = answer_generation_function
     elif function_call_flag == 5:
-        function_call = sub_question_phrase_identification_function
+        function_call = entity_encapsulating_phrase_identification_function
     elif function_call_flag == 6:
         function_call = title_extraction_function
+    elif function_call_flag == 7:
+        function_call = next_hop_phrase_extraction
+    elif function_call_flag == 8:
+        function_call = text_generation_function
 
-    #model = "gpt-3.5-turbo" # "gpt-4o" # "gpt-4o-mini" #"gpt-4-turbo"  # "gpt-4"
     client = OpenAI()
     completion = client.chat.completions.create(
         model=model,
@@ -171,7 +149,3 @@ def llama(user_prompt, sys_prompt_string="You are an experienced annotator."):
     else:
         print(f"Error: {response.status_code}")
         return None
-
-
-# if __name__ == "__main__":
-
