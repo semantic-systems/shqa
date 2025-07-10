@@ -12,6 +12,6 @@ To run the code:
 Tilahun Abedissa Taffa and Ricardo Usbeck. 2025. Bridge-Generate: Schol-
 arly Hybrid Question Answering. In Companion Proceedings of the ACM
 Web Conference 2025 (WWW Companion ’25), April 28-May 2, 2025, Sydney,
-NSW, Australia. ACM, New York, NY, USA, 5 pages. https://doi.org/10.1145/
-3701716.3715459.
+NSW, Australia. ACM, New York, NY, USA. [https://doi.org/10.1145/
+3701716.3715459](https://dl.acm.org/doi/10.1145/3701716.3715459).
 
